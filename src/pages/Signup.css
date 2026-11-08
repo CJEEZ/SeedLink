@@ -1,0 +1,60 @@
+.signup-main {
+  align-items: center;
+}
+
+.signup-main-auth {
+  grid-template-columns: minmax(0, 390px) minmax(0, 420px);
+  padding: 32px 24px;
+}
+
+.signup-main .login-form-wrap {
+  width: min(100%, 420px);
+}
+
+.signup-main .login-lock {
+  margin-bottom: 18px;
+}
+
+.signup-main .login-intro {
+  margin-bottom: 18px;
+}
+
+.signup-form {
+  gap: 9px;
+}
+
+.signup-form .login-field {
+  min-height: 60px;
+}
+
+.signup-select ion-select {
+  width: 100%;
+  min-height: 60px;
+  color: #293a2e;
+  font-size: 13px;
+}
+
+.signup-staff-note {
+  margin: 15px 0 0;
+  color: #899188;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  .signup-main {
+    align-items: center;
+  }
+
+  .signup-main-auth {
+    grid-template-columns: minmax(0, 420px);
+    padding: 24px 18px;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 900px) {
+  .signup-main-auth {
+    grid-template-columns: minmax(0, 320px) minmax(0, 380px);
+    gap: 28px;
+  }
+}

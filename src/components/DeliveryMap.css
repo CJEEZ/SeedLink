@@ -1,0 +1,132 @@
+.delivery-map-wrap {
+  margin: 0 25px 18px 79px;
+  overflow: hidden;
+  border: 1px solid #d5e1d3;
+  border-radius: 8px;
+  background: #f5f8f2;
+}
+
+.delivery-map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #dfe9dd;
+}
+
+.delivery-map-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.delivery-map-kicker {
+  color: #63806b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.delivery-map-heading strong {
+  color: #294b36;
+  font-size: 12px;
+}
+
+.delivery-map-live,
+.delivery-map-waiting {
+  padding: 5px 7px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.delivery-map-live {
+  background: #dcefe1;
+  color: #36704b;
+}
+
+.delivery-map-waiting {
+  background: #edf1e9;
+  color: #718074;
+}
+
+.delivery-map-canvas,
+.delivery-map-canvas .leaflet-container {
+  width: 100%;
+  height: 280px;
+}
+
+.delivery-map-canvas .leaflet-container {
+  background: #dce9df;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.delivery-map-note {
+  margin: 0;
+  padding: 9px 14px 11px;
+  color: #718074;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.delivery-destination-marker {
+  position: relative;
+  display: block;
+  width: 26px;
+  height: 26px;
+  border: 3px solid #fffefa;
+  border-radius: 50% 50% 50% 0;
+  background: #d94f4f;
+  box-shadow: 0 3px 9px rgb(48 35 35 / 35%);
+  transform: rotate(-45deg);
+}
+
+.delivery-destination-marker::after {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fffefa;
+  content: '';
+}
+
+.delivery-vehicle-marker {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 3px solid #fffefa;
+  border-radius: 50%;
+  background: #d49b3f;
+  box-shadow: 0 4px 12px rgb(23 62 44 / 30%);
+}
+
+.delivery-vehicle-marker img {
+  width: 22px;
+  height: 22px;
+  filter: brightness(0) invert(1);
+}
+
+.delivery-map-compact {
+  margin: 0 0 18px;
+}
+
+.delivery-map-compact .delivery-map-canvas,
+.delivery-map-compact .delivery-map-canvas .leaflet-container {
+  height: 230px;
+}
+
+@media (max-width: 680px) {
+  .delivery-map-wrap {
+    margin: 0 16px 16px 16px;
+  }
+
+  .delivery-map-canvas,
+  .delivery-map-canvas .leaflet-container {
+    height: 190px;
+  }
+
+}

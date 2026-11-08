@@ -1,0 +1,138 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function profileData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(value) {
+      return signedIn() && role() == value;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function managesDepot(depotId) {
+      return hasRole('depot_manager') && profileData().depot == depotId;
+    }
+
+    function validBatch() {
+      return request.resource.data.seedName is string
+        && request.resource.data.category in ['Rice', 'Corn', 'Vegetables']
+        && request.resource.data.stock is int
+        && request.resource.data.stock >= 0
+        && request.resource.data.municipality is string
+        && request.resource.data.batchCode is string
+        && request.resource.data.depot is string;
+    }
+
+    match /users/{userId} {
+      allow get: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.keys().hasAll(['displayName', 'email', 'role', 'municipality', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'role', 'municipality', 'createdAt'])
+        && request.resource.data.role == 'farmer'
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.municipality in [
+          'Baco', 'Bansud', 'Bongabong', 'Bulalacao', 'Calapan City', 'Gloria',
+          'Mansalay', 'Naujan', 'Pinamalayan', 'Pola', 'Puerto Galera', 'Roxas',
+          'San Teodoro', 'Socorro', 'Victoria'
+        ]
+        && request.resource.data.createdAt == request.time;
+      allow list, update, delete: if false;
+    }
+
+    match /artifacts/{appId}/public/data/seedInventory/{batchId} {
+      allow read: if true;
+      allow create: if (isAdmin() || managesDepot(request.resource.data.depot)) && validBatch();
+      allow update: if (isAdmin()
+          || (managesDepot(resource.data.depot) && managesDepot(request.resource.data.depot)))
+        && validBatch();
+      allow delete: if isAdmin() || managesDepot(resource.data.depot);
+    }
+
+    match /artifacts/{appId}/public/data/allocationRequests/{requestId} {
+      allow read: if isAdmin()
+        || managesDepot(resource.data.depot)
+        || hasRole('executive')
+        || (hasRole('farmer') && resource.data.requesterUid == request.auth.uid);
+
+      allow create: if hasRole('farmer')
+        && request.resource.data.requesterUid == request.auth.uid
+        && request.resource.data.requesterName == profileData().displayName
+        && request.resource.data.municipality == profileData().municipality
+        && request.resource.data.depot is string
+        && request.resource.data.depot == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.depot
+        && request.resource.data.seedName == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.seedName
+        && request.resource.data.category == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.category
+        && request.resource.data.requestedBags <= get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.stock
+        && request.resource.data.status == 'pending'
+        && request.resource.data.deliveryVerified == false
+        && request.resource.data.requestedBags is int
+        && request.resource.data.requestedBags > 0
+        && request.resource.data.keys().hasAll([
+          'requesterUid', 'requesterName', 'batchId', 'depot', 'seedName', 'category',
+          'requestedBags', 'municipality', 'note', 'status', 'deliveryVerified', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'requesterUid', 'requesterName', 'batchId', 'depot', 'seedName', 'category',
+          'requestedBags', 'municipality', 'note', 'status', 'deliveryVerified', 'createdAt', 'updatedAt'
+        ]);
+
+      allow update: if ((isAdmin() || managesDepot(resource.data.depot))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status', 'truckId', 'freightNote', 'updatedAt'
+          ])
+          && ((resource.data.status == 'pending'
+              && request.resource.data.status in ['approved', 'rejected'])
+            || (resource.data.status == 'approved'
+              && request.resource.data.status == 'in_transit')
+            || (resource.data.status == 'in_transit'
+              && request.resource.data.status == 'delivered')))
+        || (hasRole('farmer')
+          && resource.data.requesterUid == request.auth.uid
+          && resource.data.status == 'delivered'
+          && request.resource.data.deliveryVerified == true
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'deliveryVerified', 'deliveryVerifiedAt', 'updatedAt'
+          ]))
+        || (hasRole('farmer')
+          && resource.data.requesterUid == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.status == 'pending'
+          && request.resource.data.requesterUid == resource.data.requesterUid
+          && request.resource.data.requesterName == resource.data.requesterName
+          && request.resource.data.deliveryVerified == resource.data.deliveryVerified
+          && request.resource.data.municipality == profileData().municipality
+          && request.resource.data.requestedBags is int
+          && request.resource.data.requestedBags > 0
+          && exists(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId))
+          && request.resource.data.depot == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.depot
+          && request.resource.data.seedName == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.seedName
+          && request.resource.data.category == get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.category
+          && (request.resource.data.requestedBags <= get(/databases/$(database)/documents/artifacts/$(appId)/public/data/seedInventory/$(request.resource.data.batchId)).data.stock
+            || (request.resource.data.batchId == resource.data.batchId
+              && request.resource.data.requestedBags == resource.data.requestedBags))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'batchId', 'depot', 'seedName', 'category', 'requestedBags', 'municipality', 'note', 'updatedAt'
+          ]));
+
+      allow delete: if hasRole('farmer')
+        && resource.data.requesterUid == request.auth.uid
+        && resource.data.status == 'pending';
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "short_name": "SeedLink",
+  "name": "SeedLink",
+  "icons": [
+    {
+      "src": "Agricultural%20Logo%20for%20SeedLink%20(1).png",
+      "sizes": "any",
+      "type": "image/png"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#ffffff",
+  "background_color": "#ffffff"
+}

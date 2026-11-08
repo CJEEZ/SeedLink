@@ -1,0 +1,7 @@
+{
+  "name": "seedlink-app",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}
