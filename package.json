@@ -12,10 +12,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
     "@capacitor/app": "8.1.1",
     "@capacitor/core": "8.5.2",
     "@capacitor/haptics": "8.0.2",
     "@capacitor/keyboard": "8.0.5",
+    "@capacitor/push-notifications": "^8.1.3",
     "@capacitor/status-bar": "8.0.3",
     "@dataconnect/generated": "file:src/dataconnect-generated",
     "@ionic/react": "^9.0.0",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.2",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@testing-library/dom": ">=7.21.4",
     "@testing-library/jest-dom": "^5.16.5",
     "@testing-library/react": "^16.2.0",

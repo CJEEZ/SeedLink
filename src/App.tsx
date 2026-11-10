@@ -1,6 +1,7 @@
 import { Navigate, Route } from 'react-router-dom';
-import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, IonToast, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
+import { useEffect, useState } from 'react';
 import Home from './pages/RoleWorkspace';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
@@ -8,6 +9,7 @@ import Signup from './pages/Signup';
 import { AuthProvider } from './auth/AuthContext';
 import { useAuth } from './auth/useAuth';
 import { IonContent, IonPage, IonSpinner } from '@ionic/react';
+import { listenForForegroundPush } from './data/pushNotifications';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -40,6 +42,24 @@ const ProtectedHome: React.FC = () => {
   return profile ? <Home /> : <Navigate to="/login" replace />;
 };
 
+const ForegroundPushToast: React.FC = () => {
+  const [notification, setNotification] = useState<{ title: string; body: string } | null>(null);
+
+  useEffect(() => listenForForegroundPush(setNotification), []);
+
+  return (
+    <IonToast
+      isOpen={Boolean(notification)}
+      header={notification?.title}
+      message={notification?.body}
+      duration={6000}
+      position="top"
+      buttons={[{ text: 'Close', role: 'cancel' }]}
+      onDidDismiss={() => setNotification(null)}
+    />
+  );
+};
+
 const App: React.FC = () => (
   <AuthProvider>
     <IonApp>
@@ -51,6 +71,7 @@ const App: React.FC = () => (
         <Route path="/" element={<Landing />} />
       </IonRouterOutlet>
       </IonReactRouter>
+      <ForegroundPushToast />
     </IonApp>
   </AuthProvider>
 );

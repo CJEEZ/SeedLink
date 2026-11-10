@@ -16,7 +16,7 @@ import {
   IonToast,
   IonToolbar,
 } from '@ionic/react';
-import { carOutline, checkmarkCircleOutline, chevronDownOutline, chevronUpOutline, createOutline, locationOutline, receiptOutline, trashOutline } from 'ionicons/icons';
+import { carOutline, checkmarkCircleOutline, chevronDownOutline, chevronUpOutline, createOutline, ellipsisHorizontalOutline, leafOutline, locationOutline, receiptOutline, trashOutline } from 'ionicons/icons';
 import {
   equalTo,
   get,
@@ -30,7 +30,7 @@ import {
   set,
   update,
 } from 'firebase/database';
-import { Fragment, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent, type TouchEvent } from 'react';
 import { useAuth } from '../auth/useAuth';
 import { database } from '../firebase';
 import DeliveryMap from '../components/DeliveryMap';
@@ -93,7 +93,10 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
   const [editingFarmerRequestId, setEditingFarmerRequestId] = useState<string | null>(null);
   const [pendingDeleteRequest, setPendingDeleteRequest] = useState<AllocationRequest | null>(null);
   const [isDeletingRequest, setIsDeletingRequest] = useState(false);
+  const [openSwipeRequestId, setOpenSwipeRequestId] = useState<string | null>(null);
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const [editingRequest, setEditingRequest] = useState<AllocationRequest | null>(null);
+  const [viewingBatchImage, setViewingBatchImage] = useState<SeedBatch | null>(null);
   const [reviewStatus, setReviewStatus] = useState<RequestStatus>('pending');
   const [truckId, setTruckId] = useState('');
   const [freightNote, setFreightNote] = useState('');
@@ -166,6 +169,7 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
     () => availableBatches.find((batch) => batch.id === selectedBatchId),
     [availableBatches, selectedBatchId],
   );
+  const availableBatchCount = availableBatches.filter((batch) => batch.stock > 0).length;
   const batchesById = useMemo(
     () => new Map(availableBatches.map((batch) => [batch.id, batch])),
     [availableBatches],
@@ -499,10 +503,44 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
     }
   };
 
+  const canManageFarmerRequest = (request: AllocationRequest) =>
+    isFarmer && request.status === 'pending' && request.requesterUid === user?.uid;
+
+  const handleRequestTouchStart = (event: TouchEvent<HTMLElement>, request: AllocationRequest) => {
+    if (!canManageFarmerRequest(request)) {
+      swipeStart.current = null;
+      setOpenSwipeRequestId(null);
+      return;
+    }
+    const touch = event.touches[0];
+    swipeStart.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleRequestTouchEnd = (event: TouchEvent<HTMLElement>, request: AllocationRequest) => {
+    const start = swipeStart.current;
+    swipeStart.current = null;
+    if (!start || !canManageFarmerRequest(request)) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - start.x;
+    const deltaY = touch.clientY - start.y;
+    if (Math.abs(deltaX) < 44 || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    setOpenSwipeRequestId(deltaX < 0 ? request.id : null);
+  };
+
   return (
     <section className="role-workspace requests-workspace">
       {isFarmer && !trackingOnly && <section id="request-seed-allocation" className="inventory-panel request-form-panel">
-        <div className="panel-heading"><div><h2>{editingFarmerRequestId ? 'Edit allocation request' : 'Request seed allocation'}</h2><p>Choose an available batch and your delivery municipality.</p></div></div>
+        <div className="panel-heading request-panel-heading">
+          <div>
+            <p className="eyebrow">SEED ALLOCATION</p>
+            <h2>{editingFarmerRequestId ? 'Edit allocation request' : 'Request seed allocation'}</h2>
+            <p>Choose a seed variety and tell us where to deliver it.</p>
+          </div>
+          <span className="request-availability-pill">
+            <IonIcon icon={leafOutline} />
+            {availableBatchCount} {availableBatchCount === 1 ? 'variety' : 'varieties'} available
+          </span>
+        </div>
         <form className="request-form" onSubmit={(event) => void submitRequest(event)}>
           <div className="request-batch-field">
             <IonItem className="form-field" lines="none">
@@ -510,28 +548,66 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
                 {availableBatches.filter((batch) => batch.stock > 0 || (farmerRequestBeingEdited?.batchId === batch.id)).map((batch) => <IonSelectOption key={batch.id} value={batch.id}>{batch.seedName} · {batch.category} · {batch.stock} bags · {batch.municipality}</IonSelectOption>)}
               </IonSelect>
             </IonItem>
-            <p className="available-hint" aria-hidden={!selectedBatch}>{selectedBatch ? `${selectedBatch.stock} bags currently available at ${selectedBatch.depot || 'the listed depot'}.` : '\u00a0'}</p>
+            <p className="available-hint request-selection-hint">
+              {availableBatchCount ? 'Select a variety to see its stock and depot.' : 'No seed varieties are currently available.'}
+            </p>
           </div>
           <IonItem className="form-field" lines="none"><IonInput label="Bags requested" labelPlacement="stacked" type="number" min="1" max={Math.max(selectedBatch?.stock ?? 0, farmerRequestBeingEdited?.batchId === selectedBatchId ? farmerRequestBeingEdited.requestedBags : 0)} step="1" inputmode="numeric" value={requestedBags} onIonInput={(event) => setRequestedBags(event.detail.value ?? '')} required /></IonItem>
           <IonItem className="form-field" lines="none"><IonInput label="Delivery municipality" labelPlacement="stacked" value={destination} maxlength={80} readonly={Boolean(profile?.municipality)} onIonInput={(event) => setDestination(event.detail.value ?? '')} required /></IonItem>
-          <IonItem className="form-field" lines="none"><IonInput label="Notes for the agriculture office" labelPlacement="stacked" placeholder="Optional" value={requestNote} maxlength={250} onIonInput={(event) => setRequestNote(event.detail.value ?? '')} /></IonItem>
+          <IonItem className="form-field request-note-field" lines="none"><IonInput label="Notes for the agriculture office" labelPlacement="stacked" placeholder="Optional" value={requestNote} maxlength={250} onIonInput={(event) => setRequestNote(event.detail.value ?? '')} /></IonItem>
+          {selectedBatch && (
+            <div className="request-selected-batch" aria-live="polite">
+              {selectedBatch.imageUrl
+                ? (
+                  <button
+                    className="request-selected-batch-image-button"
+                    type="button"
+                    onClick={() => setViewingBatchImage(selectedBatch)}
+                    aria-label={`View larger image of ${selectedBatch.seedName}`}
+                  >
+                    <img src={selectedBatch.imageUrl} alt={`${selectedBatch.seedName} seeds`} loading="lazy" />
+                    <span>View photo</span>
+                  </button>
+                )
+                : (
+                  <div className="request-selected-batch-mark" aria-label="No seed photo available">
+                    <IonIcon icon={leafOutline} />
+                    <span>No photo</span>
+                  </div>
+                )}
+              <div className="request-selected-batch-copy">
+                <strong>{selectedBatch.seedName}</strong>
+                <span>{selectedBatch.category} · {selectedBatch.municipality}</span>
+                <span>{selectedBatch.depot || 'Depot not listed'}{selectedBatch.batchCode ? ` · Batch ${selectedBatch.batchCode}` : ''}</span>
+              </div>
+              <span className="request-stock-badge">{selectedBatch.stock} bags available</span>
+            </div>
+          )}
           {formError && <p className="form-error" role="alert">{formError}</p>}
-          {editingFarmerRequestId && <IonButton fill="clear" color="medium" type="button" onClick={cancelFarmerEdit} disabled={isSubmitting}>Cancel edit</IonButton>}
-          <IonButton className="add-button" type="submit" disabled={isSubmitting || (!editingFarmerRequestId && !availableBatches.some((batch) => batch.stock > 0)) || (Boolean(editingFarmerRequestId) && !selectedBatch)}>{isSubmitting ? <IonSpinner name="dots" /> : editingFarmerRequestId ? 'Save request changes' : 'Submit allocation request'}</IonButton>
-          {!availableBatches.some((batch) => batch.stock > 0) && !editingFarmerRequestId && <p className="available-hint">No batches are currently available to request.</p>}
+          <div className="request-form-actions">
+            {editingFarmerRequestId && <IonButton fill="clear" color="medium" type="button" onClick={cancelFarmerEdit} disabled={isSubmitting}>Cancel edit</IonButton>}
+            <IonButton className="add-button" type="submit" disabled={isSubmitting || (!editingFarmerRequestId && !availableBatchCount) || (Boolean(editingFarmerRequestId) && !selectedBatch)}>{isSubmitting ? <IonSpinner name="dots" /> : editingFarmerRequestId ? 'Save request changes' : 'Submit allocation request'}</IonButton>
+          </div>
         </form>
       </section>}
 
       <section className="inventory-panel">
-        <div className="panel-heading"><div><h2>{trackingOnly ? 'Delivery status' : isFarmer ? 'My allocation requests' : 'Allocation queue'}</h2><p>{trackingOnly ? 'Follow each approved order from dispatch through delivery.' : isFarmer ? 'Follow your request through approval and delivery.' : 'Review requests and coordinate depot dispatch.'}</p></div><span className="batch-count">{visibleRequests.length} {visibleRequests.length === 1 ? (trackingOnly ? 'delivery' : 'request') : (trackingOnly ? 'deliveries' : 'requests')}</span></div>
+        <div className="panel-heading"><div><h2>{trackingOnly ? 'Delivery status' : isFarmer ? 'My allocation requests' : 'Allocation queue'}</h2><p>{trackingOnly ? 'Follow each approved order from dispatch through delivery.' : isFarmer ? 'Follow your request through approval and delivery. Swipe a pending request left to edit or delete.' : 'Review requests and coordinate depot dispatch.'}</p></div><span className="batch-count">{visibleRequests.length} {visibleRequests.length === 1 ? (trackingOnly ? 'delivery' : 'request') : (trackingOnly ? 'deliveries' : 'requests')}</span></div>
         {error && <div className="error-banner" role="alert">{error}</div>}
         {isLoading ? <div className="loading-state"><IonSpinner name="crescent" /><span>Loading requests…</span></div> : visibleRequests.length ? (
           <IonList className="request-list" lines="none">
             {visibleRequests.map((request) => {
               const canViewMap = request.status === 'approved' || request.status === 'in_transit';
+              const canSwipeManage = canManageFarmerRequest(request);
+              const isSwipeOpen = openSwipeRequestId === request.id;
               return (
                 <Fragment key={request.id}>
-              <article className={`request-row${trackingOnly ? ' tracking-request-row' : ''}`}>
+                <div className={`request-swipe-shell${isSwipeOpen ? ' is-swipe-open' : ''}`}>
+              <article
+                className={`request-row${trackingOnly ? ' tracking-request-row' : ''}${canSwipeManage ? ' is-manageable' : ''}`}
+                onTouchStart={(event) => handleRequestTouchStart(event, request)}
+                onTouchEnd={(event) => handleRequestTouchEnd(event, request)}
+              >
                 <span className="request-mark">
                   <IonIcon icon={receiptOutline} />
                   {batchesById.get(request.batchId)?.imageUrl && (
@@ -572,14 +648,38 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
                     ? <span className="verified-label"><IonIcon icon={checkmarkCircleOutline} /> Received</span>
                     : <IonButton fill="outline" className="verify-button" onClick={() => void verifyDelivery(request)}>Confirm received</IonButton>
                 )}
-                {isFarmer && request.status === 'pending' && request.requesterUid === user?.uid && (
-                  <div className="request-actions">
-                    <IonButton fill="clear" className="icon-button edit-action" onClick={() => openFarmerEdit(request)} aria-label={`Edit request for ${request.seedName}`} title="Edit request"><IonIcon slot="icon-only" icon={createOutline} /></IonButton>
-                    <IonButton fill="clear" className="icon-button delete-action" onClick={() => setPendingDeleteRequest(request)} aria-label={`Delete request for ${request.seedName}`} title="Delete request" disabled={isDeletingRequest}><IonIcon slot="icon-only" icon={trashOutline} /></IonButton>
-                  </div>
+                {canSwipeManage && (
+                  <IonButton
+                    fill="clear"
+                    className="request-swipe-toggle"
+                    aria-label={`${isSwipeOpen ? 'Hide' : 'Show'} actions for ${request.seedName} request`}
+                    aria-expanded={isSwipeOpen}
+                    onClick={() => setOpenSwipeRequestId(isSwipeOpen ? null : request.id)}
+                  >
+                    <IonIcon slot="icon-only" icon={ellipsisHorizontalOutline} />
+                  </IonButton>
                 )}
                 {isStaff && !trackingOnly && nextStatuses[request.status] && <IonButton fill="outline" className="review-button" onClick={() => openReview(request)}>Review / dispatch</IonButton>}
               </article>
+              {canSwipeManage && (
+                <div className="request-actions" aria-label={`Actions for ${request.seedName} request`}>
+                  <IonButton fill="clear" className="icon-button edit-action" onClick={() => {
+                    setOpenSwipeRequestId(null);
+                    openFarmerEdit(request);
+                  }} aria-label={`Edit request for ${request.seedName}`} title="Edit request">
+                    <IonIcon slot="start" icon={createOutline} />
+                    Edit
+                  </IonButton>
+                  <IonButton fill="clear" className="icon-button delete-action" onClick={() => {
+                    setOpenSwipeRequestId(null);
+                    setPendingDeleteRequest(request);
+                  }} aria-label={`Delete request for ${request.seedName}`} title="Delete request" disabled={isDeletingRequest}>
+                    <IonIcon slot="start" icon={trashOutline} />
+                    Delete
+                  </IonButton>
+                </div>
+              )}
+                </div>
               {trackingOnly && (
                 <ol className="delivery-status-steps" aria-label={`Delivery progress: ${request.deliveryVerified ? 'Received' : statusLabels[request.status]}`}>
                   {deliveryStages.map((stage, index) => {
@@ -656,6 +756,33 @@ const RequestsView: React.FC<RequestsViewProps> = ({ trackingOnly = false }) => 
           </IonList>
         </section>
       )}
+
+      <IonModal
+        isOpen={viewingBatchImage !== null}
+        onDidDismiss={() => setViewingBatchImage(null)}
+        className="seed-image-modal"
+        aria-label={viewingBatchImage ? `${viewingBatchImage.seedName} seed image` : 'Seed image'}
+      >
+        <IonHeader>
+          <IonToolbar className="modal-toolbar">
+            <IonTitle>{viewingBatchImage?.seedName ?? 'Seed image'}</IonTitle>
+            <IonButton slot="end" fill="clear" onClick={() => setViewingBatchImage(null)} aria-label="Close seed image">
+              Close
+            </IonButton>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent className="seed-image-modal-content">
+          {viewingBatchImage?.imageUrl && (
+            <figure className="seed-image-viewer">
+              <img src={viewingBatchImage.imageUrl} alt={`${viewingBatchImage.seedName} seeds`} />
+              <figcaption>
+                <strong>{viewingBatchImage.seedName}</strong>
+                <span>{viewingBatchImage.category} · {viewingBatchImage.batchCode}</span>
+              </figcaption>
+            </figure>
+          )}
+        </IonContent>
+      </IonModal>
 
       <IonModal isOpen={editingRequest !== null} onDidDismiss={() => !isSavingReview && setEditingRequest(null)} className="seed-modal">
         <IonHeader><IonToolbar className="modal-toolbar"><IonTitle>Review allocation</IonTitle></IonToolbar></IonHeader>

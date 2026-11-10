@@ -1,13 +1,16 @@
+import { Capacitor } from '@capacitor/core';
 import { IonButton, IonIcon, IonSpinner, IonToast } from '@ionic/react';
 import { FirebaseError } from 'firebase/app';
 import { updateProfile } from 'firebase/auth';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { checkmarkCircleOutline, imageOutline, keyOutline, leafOutline, locationOutline, mailOutline, personOutline } from 'ionicons/icons';
+import { checkmarkCircleOutline, imageOutline, keyOutline, leafOutline, locationOutline, mailOutline, notificationsOutline, personOutline } from 'ionicons/icons';
 import { equalTo, onValue, orderByChild, query } from 'firebase/database';
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useAuth } from '../auth/useAuth';
-import { database, storage } from '../firebase';
+import { database, firebaseVapidKey, storage } from '../firebase';
 import { getStoredRequests, requestsFromSnapshot, requestsRef, type AllocationRequest } from '../data/seedlink';
+import { getEmailPreferenceReference, saveEmailNotificationPreference } from '../data/emailNotifications';
+import { disablePushNotifications, enablePushNotifications, getPushDeviceReference } from '../data/pushNotifications';
 
 const FarmerProfileView: React.FC = () => {
   const { profile, user, sendPasswordReset } = useAuth();
@@ -19,6 +22,14 @@ const FarmerProfileView: React.FC = () => {
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(null);
   const [failedAvatarUrl, setFailedAvatarUrl] = useState<string | null>(null);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(false);
+  const [pushSettingsLoaded, setPushSettingsLoaded] = useState(false);
+  const [pushSettingsError, setPushSettingsError] = useState('');
+  const [isUpdatingPushSettings, setIsUpdatingPushSettings] = useState(false);
+  const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(false);
+  const [emailSettingsLoaded, setEmailSettingsLoaded] = useState(false);
+  const [emailSettingsError, setEmailSettingsError] = useState('');
+  const [isUpdatingEmailSettings, setIsUpdatingEmailSettings] = useState(false);
   const photoInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -59,12 +70,53 @@ const FarmerProfileView: React.FC = () => {
   );
   const googleProvider = user?.providerData.find((provider) => provider.providerId === 'google.com');
   const profileImageUrl = uploadedAvatarUrl || user?.photoURL || googleProvider?.photoURL || null;
-  const accountEmail = profile?.email || user?.email || googleProvider?.email || '';
+  const accountEmail = user?.email || profile?.email || googleProvider?.email || '';
   const canResetPassword = Boolean(database && user?.providerData.some((provider) => provider.providerId === 'password') && accountEmail);
 
   useEffect(() => {
     setFailedAvatarUrl(null);
   }, [profileImageUrl]);
+
+  useEffect(() => {
+    setPushSettingsError('');
+    setPushSettingsLoaded(false);
+    if (!database || !user || profile?.role !== 'farmer') {
+      setPushNotificationsEnabled(false);
+      setPushSettingsLoaded(true);
+      return;
+    }
+
+    const deviceTokenRef = getPushDeviceReference(database, user.uid);
+    const unsubscribe = onValue(deviceTokenRef, (snapshot) => {
+      setPushNotificationsEnabled(snapshot.exists());
+      setPushSettingsLoaded(true);
+      setPushSettingsError('');
+    }, (syncError) => {
+      setPushSettingsLoaded(true);
+      setPushSettingsError(syncError.message || 'Could not load notification settings.');
+    });
+    return unsubscribe;
+  }, [profile?.role, user]);
+
+  useEffect(() => {
+    setEmailSettingsError('');
+    setEmailSettingsLoaded(false);
+    if (!database || !user || profile?.role !== 'farmer') {
+      setEmailNotificationsEnabled(false);
+      setEmailSettingsLoaded(true);
+      return;
+    }
+
+    const unsubscribe = onValue(getEmailPreferenceReference(database, user.uid), (snapshot) => {
+      setEmailNotificationsEnabled(snapshot.child('enabled').val() === true);
+      setEmailSettingsLoaded(true);
+      setEmailSettingsError('');
+    }, (syncError) => {
+      setEmailSettingsLoaded(true);
+      setEmailSettingsError(syncError.message || 'Could not load email notification settings.');
+    });
+    return unsubscribe;
+  }, [profile?.role, user]);
 
   useEffect(() => {
     setUploadedAvatarUrl(null);
@@ -122,6 +174,43 @@ const FarmerProfileView: React.FC = () => {
       setToastMessage(resetError instanceof Error ? resetError.message : 'Could not send the password reset link.');
     } finally {
       setIsSendingReset(false);
+    }
+  };
+
+  const togglePushNotifications = async () => {
+    if (!database || !user || pushSettingsError) return;
+    setIsUpdatingPushSettings(true);
+    try {
+      if (pushNotificationsEnabled) {
+        await disablePushNotifications(database, user.uid);
+        setPushNotificationsEnabled(false);
+        setToastMessage('Push notifications turned off for this device.');
+      } else {
+        await enablePushNotifications(database, user.uid);
+        setPushNotificationsEnabled(true);
+        setToastMessage('Push notifications enabled for this device.');
+      }
+    } catch (pushError) {
+      setToastMessage(pushError instanceof Error ? pushError.message : 'Could not update push notification settings.');
+    } finally {
+      setIsUpdatingPushSettings(false);
+    }
+  };
+
+  const toggleEmailNotifications = async () => {
+    if (!database || !user || !accountEmail || emailSettingsError) return;
+    setIsUpdatingEmailSettings(true);
+    try {
+      const enabled = !emailNotificationsEnabled;
+      await saveEmailNotificationPreference(database, user.uid, enabled);
+      setEmailNotificationsEnabled(enabled);
+      setToastMessage(enabled
+        ? `Email updates enabled for ${accountEmail}.`
+        : 'Email updates turned off.');
+    } catch (emailError) {
+      setToastMessage(emailError instanceof Error ? emailError.message : 'Could not update email notification settings.');
+    } finally {
+      setIsUpdatingEmailSettings(false);
     }
   };
 
@@ -195,6 +284,70 @@ const FarmerProfileView: React.FC = () => {
         </article>
       </section>
       {requestError && <div className="error-banner" role="alert">{requestError}</div>}
+
+      <section className="inventory-panel farmer-push-card" aria-labelledby="farmer-push-title">
+        <div className="farmer-push-heading">
+          <span className="farmer-push-icon"><IonIcon icon={notificationsOutline} /></span>
+          <div>
+            <p className="eyebrow">OPTIONAL NOTIFICATIONS</p>
+            <h2 id="farmer-push-title">Delivery notifications</h2>
+          </div>
+        </div>
+        <p className="farmer-push-description">
+          Get a push notification when your request is approved, on the way, or delivered. Notifications appear on this
+          device when you allow them in your browser or Android settings. Turn them off here any time.
+        </p>
+        {pushSettingsError && <p className="support-error" role="alert">Notifications unavailable: {pushSettingsError}</p>}
+        {!database && <p className="farmer-push-note">Connect a Firebase account to manage notifications.</p>}
+        {Capacitor.getPlatform() === 'web' && !firebaseVapidKey && (
+          <p className="farmer-push-note">Web push needs a Firebase Web Push key. See the Firebase setup instructions.</p>
+        )}
+        <IonButton
+          fill={pushNotificationsEnabled ? 'outline' : 'solid'}
+          className={pushNotificationsEnabled ? 'request-again-button farmer-push-toggle' : 'save-button farmer-push-toggle'}
+          onClick={() => void togglePushNotifications()}
+          disabled={!database || !user || !pushSettingsLoaded || Boolean(pushSettingsError) || isUpdatingPushSettings}
+        >
+          {isUpdatingPushSettings
+            ? <IonSpinner name="dots" />
+            : pushNotificationsEnabled
+              ? 'Turn off notifications for this device'
+              : 'Enable notifications on this device'}
+        </IonButton>
+      </section>
+
+      <section className="inventory-panel farmer-push-card" aria-labelledby="farmer-email-title">
+        <div className="farmer-push-heading">
+          <span className="farmer-push-icon"><IonIcon icon={mailOutline} /></span>
+          <div>
+            <p className="eyebrow">OPTIONAL NOTIFICATIONS</p>
+            <h2 id="farmer-email-title">Email request updates</h2>
+          </div>
+        </div>
+        <p className="farmer-push-description">
+          Get an email at your SeedLink account address, <strong>{accountEmail || 'No email on file'}</strong>, when you
+          submit a request, it is approved or not approved, it goes on the way or is delivered, and when you confirm
+          receipt. You can turn these emails off here any time.
+        </p>
+        <p className="farmer-push-note">
+          These messages are sent to your inbox (including Gmail); they are not pop-up notifications. Email delivery
+          starts after SeedLink’s email service is configured. Enabling this setting does not send an email immediately.
+        </p>
+        {emailSettingsError && <p className="support-error" role="alert">Email notifications unavailable: {emailSettingsError}</p>}
+        {!database && <p className="farmer-push-note">Connect a Firebase account to manage email notifications.</p>}
+        <IonButton
+          fill={emailNotificationsEnabled ? 'outline' : 'solid'}
+          className={emailNotificationsEnabled ? 'request-again-button farmer-push-toggle' : 'save-button farmer-push-toggle'}
+          onClick={() => void toggleEmailNotifications()}
+          disabled={!database || !user || !accountEmail || !emailSettingsLoaded || Boolean(emailSettingsError) || isUpdatingEmailSettings}
+        >
+          {isUpdatingEmailSettings
+            ? <IonSpinner name="dots" />
+            : emailNotificationsEnabled
+              ? 'Turn off email updates'
+              : 'Enable email updates'}
+        </IonButton>
+      </section>
 
       <section className="inventory-panel farmer-profile-security">
         <div>

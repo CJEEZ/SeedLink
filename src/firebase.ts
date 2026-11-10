@@ -46,6 +46,7 @@ export const firebaseConfig = (() => {
   }
 })();
 
+export const firebaseVapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim() ?? '';
 export const app = firebaseConfig ? (getApps().length ? getApp() : initializeApp(firebaseConfig)) : undefined;
 export const database: Database | null = app ? getDatabase(app) : null;
 export const auth: Auth | null = app ? getAuth(app) : null;

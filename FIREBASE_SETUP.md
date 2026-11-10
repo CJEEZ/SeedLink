@@ -12,6 +12,68 @@ docker compose --profile emulators up -d --build firebase-emulators
 
 The SQL Connect emulator listens on `http://localhost:9399`. It uses the demo project ID `demo-seedlink` so local emulator work does not target the production Firebase project. Emulator data is stored in `dataconnect/.dataconnect/pgliteData`. Stop the container with `docker compose --profile emulators stop firebase-emulators`.
 
+## Farmer request push notifications
+
+Farmers can enable notifications for this browser or Android device from **Farmer profile → Delivery notifications**. When an administrator changes a request to approved, in transit, or delivered, a Firebase Cloud Function sends an FCM push notification to the farmer's registered devices. Rejected requests do not send a notification. Push notifications go to the app/browser, not a phone number; no Semaphore account or SMS charges are involved.
+
+FCM message delivery has no per-message charge. Deploying the status-triggered Cloud Function requires Firebase Blaze with billing enabled. Cloud Functions has a monthly no-cost quota; usage beyond applicable quotas may be billed.
+
+### Web setup
+
+1. `VITE_FIREBASE_VAPID_KEY` is already configured in the local `.env.local` and documented in `.env.example`. The key is public; `.env.local` is ignored by Git.
+2. If using a different Firebase project, generate a Web Push certificate key pair in Firebase Console → Project settings → Cloud Messaging, then set its public key as `VITE_FIREBASE_VAPID_KEY` in `.env.local`.
+3. Ensure the site is served over HTTPS (localhost is allowed for development), rebuild, and redeploy the web app. Each farmer must allow browser notifications on each device.
+
+### Android setup
+
+1. Register an Android Firebase app with package name `com.seedlink.app`.
+2. Download `google-services.json` into `android/app/google-services.json`. It is ignored by Git.
+3. Run `npx cap sync android`, then build and install the Android app. Android 13 and later prompt the farmer to grant notification permission.
+
+### Deploy and test
+
+After enabling Blaze, install Functions dependencies and deploy the rules and sender:
+
+```powershell
+npm ci --prefix functions
+firebase deploy --only database,functions --project seedlink-43161
+```
+
+The function uses Firebase Admin credentials; no FCM server key is stored in the app. Each farmer must enable notifications on the device they want to receive them on.
+
+Run the backend unit tests locally with:
+
+```powershell
+npm ci
+npm ci --prefix functions
+npm test --prefix functions
+```
+
+Run the Realtime Database push-token access-rule tests in the emulator with:
+
+```powershell
+firebase emulators:exec --only database --project demo-seedlink --config firebase.rules-test.json "npm run test:rules --prefix functions"
+```
+
+## Farmer email notifications
+
+Farmers can opt in from **Farmer profile → Email request updates**. Emails go to the email address on the farmer's Firebase Authentication account (including the Gmail address used to sign in). With email updates enabled, notifications are sent when a farmer submits a request, an administrator approves or rejects it, its status changes to in transit or delivered, and the farmer confirms receipt. Editing other request details does not send an email. Email is off by default and can be turned off in the profile.
+
+Email delivery uses Resend. The notification function is not active until deployment. Before deploying, enable Firebase Blaze billing, create a Resend account, and verify a sender domain. Store the API key as a Firebase secret and set the sender address during deployment:
+
+```powershell
+firebase functions:secrets:set RESEND_API_KEY --project seedlink-43161
+firebase deploy --only database,functions --project seedlink-43161
+```
+
+Firebase prompts for `RESEND_FROM_EMAIL` during deployment. Use a sender address on the verified Resend domain (for example, `SeedLink <updates@example.com>`). Do not put the Resend API key in the web app, `.env.local`, or source control. Function deployment requires Blaze; provider usage may have separate limits or charges.
+
+Test email-content generation with:
+
+```powershell
+npm test --prefix functions
+```
+
 ## Customer service inbox
 
 Farmers can open a private conversation from **Customer service** in their dashboard. They choose a topic, add a subject, and send messages to the SeedLink administration team. Administrators can view all conversations, reply, close or reopen, and delete them. Farmers can view and reply only to their own open conversations and can delete their own conversations. Deletion permanently removes the conversation and its messages. The local demo mode stores conversations in the browser's local storage; production conversations use the Realtime Database.

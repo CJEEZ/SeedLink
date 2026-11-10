@@ -6,6 +6,57 @@
         ".write": "auth != null && auth.uid == $uid && ((!data.exists() && newData.hasChildren(['displayName', 'role', 'municipality', 'createdAt']) && ((!newData.child('email').exists() && auth.token.firebase.sign_in_provider == 'google.com') || (newData.child('email').isString() && newData.child('email').val() == auth.token.email)) && newData.child('role').val() == 'farmer' && newData.child('displayName').isString() && newData.child('displayName').val().length >= 2 && newData.child('municipality').isString() && newData.child('createdAt').isString()) || (data.exists() && data.child('role').val() == 'farmer' && !data.child('municipality').exists() && newData.child('role').val() == data.child('role').val() && newData.child('displayName').val() == data.child('displayName').val() && newData.child('email').val() == data.child('email').val() && newData.child('createdAt').val() == data.child('createdAt').val() && newData.child('municipality').isString()))"
       }
     },
+    "smsPreferences": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['phoneNumber', 'smsAlertsEnabled']) && newData.child('phoneNumber').isString() && (newData.child('phoneNumber').val() == '' || newData.child('phoneNumber').val().matches(/^\\+639[0-9]{9}$/)) && newData.child('smsAlertsEnabled').isBoolean() && (newData.child('smsAlertsEnabled').val() == false || newData.child('phoneNumber').val().matches(/^\\+639[0-9]{9}$/))",
+        "phoneNumber": {
+          ".write": "auth != null && auth.uid == $uid && root.child('users').child(auth.uid).child('role').val() == 'farmer'",
+          ".validate": "newData.isString() && (newData.val() == '' || newData.val().matches(/^\\+639[0-9]{9}$/)) && (newData.parent().child('smsAlertsEnabled').val() != true || newData.val().matches(/^\\+639[0-9]{9}$/))"
+        },
+        "smsAlertsEnabled": {
+          ".write": "auth != null && auth.uid == $uid && root.child('users').child(auth.uid).child('role').val() == 'farmer'",
+          ".validate": "newData.isBoolean() && (newData.val() == false || newData.parent().child('phoneNumber').val().matches(/^\\+639[0-9]{9}$/))"
+        }
+      }
+    },
+    "emailPreferences": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && root.child('users').child(auth.uid).child('role').val() == 'farmer'",
+        ".validate": "!newData.exists() || (newData.hasChildren(['enabled', 'updatedAt']) && newData.child('enabled').isBoolean() && newData.child('updatedAt').isNumber())",
+        "enabled": {
+          ".validate": "newData.isBoolean()"
+        },
+        "updatedAt": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": "!newData.exists()"
+        }
+      }
+    },
+    "pushTokens": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "$deviceId": {
+          ".write": "auth != null && auth.uid == $uid && root.child('users').child(auth.uid).child('role').val() == 'farmer'",
+          ".validate": "!newData.exists() || newData.hasChildren(['token', 'platform', 'updatedAt'])",
+          "token": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 4096"
+          },
+          "platform": {
+            ".validate": "newData.val() == 'web' || newData.val() == 'android'"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": "!newData.exists()"
+          }
+        }
+      }
+    },
     "seedInventory": {
       ".read": true,
       "$batchId": {

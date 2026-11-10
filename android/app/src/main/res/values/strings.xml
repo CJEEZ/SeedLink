@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SeedLink</string>
+    <string name="title_activity_main">SeedLink</string>
+    <string name="package_name">com.seedlink.app</string>
+    <string name="custom_url_scheme">com.seedlink.app</string>
+</resources>
