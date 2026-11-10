@@ -1,5 +1,17 @@
 # Firebase setup
 
+## Publish the web app with Netlify
+
+The repository includes `netlify.toml` for the Vite production build, Node.js 22, and SPA route fallback. To connect it:
+
+1. In Netlify, choose **Add new site → Import an existing project → GitHub** and select `CJEEZ/SeedLink`. Authorize Netlify to access the repository if prompted.
+2. Set `VITE_FIREBASE_API_KEY` in the site's **Project configuration → Environment variables** to the Firebase Web API key from Firebase Console → Project settings → Your apps. This is public client configuration and will be included in the deployed JavaScript; never use a service-account key or other private credential.
+3. Optionally set `VITE_FIREBASE_VAPID_KEY` to the Web Push certificate key from Firebase Console → Project settings → Cloud Messaging to enable browser push notifications.
+4. Deploy the site. Netlify builds the `main` branch on each push and publishes `dist`. The `netlify.toml` configuration supplies the build command, output directory, root URL base path, and fallback for client-side routes.
+5. In Firebase Console, add the Netlify site hostname (for example, `your-site-name.netlify.app`) under **Authentication → Settings → Authorized domains** so sign-in works on that domain.
+
+The GitHub Pages deployment is configured separately. Netlify deployment does not require the Pages workflow.
+
 ## Publish the web app with GitHub Pages
 
 The `Deploy GitHub Pages` workflow publishes the web app at `https://cjeez.github.io/SeedLink/` whenever a commit is pushed to `main`.
