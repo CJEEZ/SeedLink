@@ -176,13 +176,13 @@ const Login: React.FC = () => {
                 loop
                 playsInline
                 preload="metadata"
-                poster="/SEEDSORMIN.jpg"
+                poster={`${import.meta.env.BASE_URL}SEEDSORMIN.jpg`}
                 onError={() => setShowLoginVideo(false)}
               >
-                <source src="/seedlink-auth-background.mp4" type="video/mp4" />
+                <source src={`${import.meta.env.BASE_URL}seedlink-auth-background.mp4`} type="video/mp4" />
               </video>
             ) : (
-              <img className="login-background-fallback" src="/SEEDSORMIN.jpg" alt="" />
+              <img className="login-background-fallback" src={`${import.meta.env.BASE_URL}SEEDSORMIN.jpg`} alt="" />
             )}
           </div>
           <section className="login-main login-main-auth">
@@ -193,7 +193,7 @@ const Login: React.FC = () => {
             </div>
             <div className="login-form-wrap login-form-wrap-3d">
               <Link className="login-brand login-card-brand" to="/" aria-label="SeedLink landing page">
-                <span className="login-brand-mark"><img src="/Agricultural%20Logo%20for%20SeedLink%20(1).png" alt="" /></span>
+                <span className="login-brand-mark"><img src={`${import.meta.env.BASE_URL}Agricultural%20Logo%20for%20SeedLink%20(1).png`} alt="" /></span>
               </Link>
               <p className="login-eyebrow">SECURE WORKSPACE</p>
               <h2>Sign in to SeedLink</h2>

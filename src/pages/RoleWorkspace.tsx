@@ -67,8 +67,8 @@ const RoleWorkspace: React.FC = () => {
     <IonPage>
       <IonHeader className="app-header">
         <IonToolbar className="topbar">
-          <a className="brand" href="/home" slot="start" aria-label="SeedLink home">
-            <span className="brand-mark"><img src="/Agricultural%20Logo%20for%20SeedLink%20(1).png" alt="" /></span>
+          <a className="brand" href={`${import.meta.env.BASE_URL}home`} slot="start" aria-label="SeedLink home">
+            <span className="brand-mark"><img src={`${import.meta.env.BASE_URL}Agricultural%20Logo%20for%20SeedLink%20(1).png`} alt="" /></span>
             <span className="brand-copy"><strong>SeedLink</strong><small>ORIENTAL MINDORO</small></span>
           </a>
           <div className="workspace-account" slot="end">

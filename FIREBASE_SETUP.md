@@ -1,5 +1,17 @@
 # Firebase setup
 
+## Publish the web app with GitHub Pages
+
+The `Deploy GitHub Pages` workflow publishes the web app at `https://cjeez.github.io/SeedLink/` whenever a commit is pushed to `main`.
+
+1. In GitHub, open **Settings → Secrets and variables → Actions** and add the `VITE_FIREBASE_API_KEY` repository secret from Firebase Console → Project settings → Your apps. This Firebase web key is public client configuration and will be visible in the deployed JavaScript; storing it as an Actions secret keeps it out of the source tree. Never use a service-account key or other private credential here.
+2. To enable browser push notifications, also add the `VITE_FIREBASE_VAPID_KEY` repository secret from Firebase Console → Project settings → Cloud Messaging. Push notifications remain unavailable until this is configured.
+3. Open **Settings → Pages** and set the build and deployment source to **GitHub Actions**.
+4. In Firebase Console, add `cjeez.github.io` under **Authentication → Settings → Authorized domains** so sign-in works on the deployed site.
+5. Push a commit to `main`, or manually run **Deploy GitHub Pages** from the repository's **Actions** tab. Open `https://cjeez.github.io/SeedLink/` after the workflow completes.
+
+The deployment uses GitHub Pages' repository subpath and includes an SPA fallback for routes such as `/login` and `/home`. The existing GitHub Actions CI workflow only validates builds; Pages deployment is handled by the separate workflow above.
+
 ## Run the SQL Connect emulator with Docker
 
 The Firebase emulators require Java. The Docker emulator service includes Java 21, so they can run without changing the Java installation on Windows.

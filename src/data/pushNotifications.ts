@@ -40,11 +40,13 @@ async function getWebPushToken(): Promise<string> {
     : await Notification.requestPermission();
   if (permission !== 'granted') throw new Error('Allow browser notifications to receive request updates.');
 
-  const serviceWorkerUrl = new URL('/firebase-messaging-sw.js', window.location.origin);
+  const serviceWorkerUrl = new URL('firebase-messaging-sw.js', document.baseURI);
   for (const [key, value] of Object.entries(firebaseConfig)) {
     if (value) serviceWorkerUrl.searchParams.set(key, String(value));
   }
-  const registration = await navigator.serviceWorker.register(serviceWorkerUrl.href);
+  const registration = await navigator.serviceWorker.register(serviceWorkerUrl.href, {
+    scope: import.meta.env.BASE_URL,
+  });
   const token = await getToken(getMessaging(app), {
     vapidKey: firebaseVapidKey,
     serviceWorkerRegistration: registration,
@@ -110,7 +112,7 @@ export async function disablePushNotifications(database: Database, uid: string):
   } else if (platform === 'web' && app && firebaseVapidKey && await isSupported()) {
     if ((await get(tokenRef)).exists()) {
       await deleteToken(getMessaging(app));
-      const registration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+      const registration = await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL);
       if (registration) await registration.unregister();
     }
   }

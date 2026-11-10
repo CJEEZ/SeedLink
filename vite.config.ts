@@ -2,7 +2,7 @@
 
 import legacy from '@vitejs/plugin-legacy'
 import react from '@vitejs/plugin-react'
-import { defineConfig, type UserConfig } from 'vite'
+import { defineConfig, loadEnv, type UserConfig } from 'vite'
 
 type VitestConfig = UserConfig & {
   test: {
@@ -25,4 +25,10 @@ const config: VitestConfig = {
   }
 }
 
-export default defineConfig(config)
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, '.', 'VITE_')
+  return {
+    ...config,
+    base: env.VITE_BASE_PATH || '/',
+  }
+})

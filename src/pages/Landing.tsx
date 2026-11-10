@@ -164,7 +164,7 @@ const Landing: React.FC = () => {
       <IonContent className="catalog-content" fullscreen>
         <header className="catalog-header">
           <Link className="catalog-brand" to="/" aria-label="SeedLink catalog home">
-            <span className="catalog-brand-mark"><img src="/Agricultural%20Logo%20for%20SeedLink%20(1).png" alt="" /></span>
+            <span className="catalog-brand-mark"><img src={`${import.meta.env.BASE_URL}Agricultural%20Logo%20for%20SeedLink%20(1).png`} alt="" /></span>
             <span><strong>SeedLink</strong><small>ORIENTAL MINDORO</small></span>
           </Link>
           <nav className="catalog-nav" aria-label="Main navigation">

@@ -63,7 +63,7 @@ const ForegroundPushToast: React.FC = () => {
 const App: React.FC = () => (
   <AuthProvider>
     <IonApp>
-      <IonReactRouter>
+      <IonReactRouter basename={import.meta.env.BASE_URL}>
       <IonRouterOutlet>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
