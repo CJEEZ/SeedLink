@@ -1,10 +1,12 @@
 import {
   createUserWithEmailAndPassword,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -162,7 +164,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let isActive = true;
     let authStateVersion = 0;
+    let redirectError = '';
     let unsubscribeProfile: Unsubscribe | undefined;
+
+    void getRedirectResult(authInstance).catch((error: unknown) => {
+      if (!isActive) return;
+      redirectError = error instanceof Error ? error.message : 'Google sign-in redirect failed.';
+      setProfileError(redirectError);
+    });
 
     const unsubscribe = onAuthStateChanged(authInstance, (currentUser) => {
       const currentVersion = ++authStateVersion;
@@ -171,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!isActive) return;
       setUser(currentUser);
       setProfile(null);
-      setProfileError('');
+      setProfileError(redirectError);
       setNeedsGoogleFarmerSetup(false);
 
       if (!currentUser) {
@@ -270,7 +279,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const provider = new GoogleAuthProvider();
       provider.addScope('email');
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(getConfiguredAuth(), provider);
+      const authInstance = getConfiguredAuth();
+
+      try {
+        await signInWithPopup(authInstance, provider);
+      } catch (error) {
+        if (
+          typeof error === 'object'
+          && error !== null
+          && 'code' in error
+          && error.code === 'auth/popup-blocked'
+        ) {
+          await signInWithRedirect(authInstance, provider);
+          return;
+        }
+
+        throw error;
+      }
     },
     completeGoogleFarmerSetup: async (municipality) => {
       if (!auth || !database) {
